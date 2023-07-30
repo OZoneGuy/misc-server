@@ -1,6 +1,8 @@
+#![allow(clippy::needless_return)]
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 const SECRETS_JSON: &str = include_str!("../secrets.json");
+const OLD_IP_PATH: &str = "/tmp/old_ip.txt";
 
 #[derive(serde::Deserialize)]
 struct Secrets {
@@ -21,6 +23,13 @@ struct UpdateIpRequest {
 
 #[post("/update-ip")]
 async fn update_ip(req: web::Json<UpdateIpRequest>, config: web::Data<Config>) -> impl Responder {
+    // Check if the IP has changed
+    let old_ip = std::fs::read_to_string(OLD_IP_PATH).unwrap_or("".to_string());
+    if old_ip == req.ip {
+        return HttpResponse::Ok().body("IP has not changed");
+    }
+
+    // load params to send to the request
     let params = [
         ("apiUser", "OZonePerson"),
         ("apiKey", &config.nc_api_key),
@@ -47,6 +56,7 @@ async fn update_ip(req: web::Json<UpdateIpRequest>, config: web::Data<Config>) -
         ("TTL2", "1800"),
     ];
 
+    // Create request to namecheap to update the IP
     let client = reqwest::Client::new();
     let res = client
         .post("https://api.namecheap.com/xml.response")
@@ -54,10 +64,15 @@ async fn update_ip(req: web::Json<UpdateIpRequest>, config: web::Data<Config>) -
         .send()
         .await;
 
-    match res {
-        Ok(_) => HttpResponse::Ok().body(format!("Updated IP to {}", &req.ip)),
+    return match res {
+        Ok(_) => {
+            // Update the old IP file
+            std::fs::write(OLD_IP_PATH, &req.ip).unwrap();
+
+            return HttpResponse::Ok().body(format!("Updated IP to {}", &req.ip));
+        }
         Err(_) => HttpResponse::InternalServerError().body("Failed to update IP"),
-    }
+    };
 }
 
 #[get("/health")]
