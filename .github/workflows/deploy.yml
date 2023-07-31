@@ -1,0 +1,41 @@
+name: Deploy to server
+on:
+  push:
+    paths-ignore:
+      - '.gitignore'
+    branches:
+      - 'main'
+jobs:
+  build_and_deploy:
+    runs-on: ['self-hosted']
+    environment: api-server
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Rust environment
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Add secrets.json
+      env:
+        SECRETS_JSON: ${{ secrets.SERVER_SECRETS }}
+      run: echo "$SECRETS_JSON" > secrets.json
+
+
+    - name: Build Rust application
+      run: cargo build --release
+
+    - name: Copy binary to remote server
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        scp -i ~/.ssh/id_rsa target/release/misc-server user@remote_server:/root/bin/server-bin
+
+    - name: Restart server
+      run: |
+        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl restart api_server'
