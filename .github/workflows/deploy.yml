@@ -34,7 +34,7 @@ jobs:
         mkdir -p ~/.ssh
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        scp -i ~/.ssh/id_rsa target/release/misc-server user@remote_server:/root/bin/server-bin
+        scp -i ~/.ssh/id_rsa target/release/misc-server root@omaralkersh.com:/root/bin/server-bin
 
     - name: Restart server
       run: |
