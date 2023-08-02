@@ -131,3 +131,64 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_record() {
+        let address = "1235";
+
+        let expected: Vec<(String, String)> = vec![
+            ("HostName1", "@"),
+            ("RecordType1", "A"),
+            ("Address1", address),
+            ("TTL1", "1800"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+
+        let actual = record(1, "@".into(), address.into());
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_create_request() {
+        let server_ip = "1234";
+        let new_ip = "1235";
+        let nc_api_key = "1236";
+
+        let expected: Vec<(String, String)> = vec![
+            ("apiUser", "OZonePerson"),
+            ("apiKey", nc_api_key),
+            ("ClientIp", server_ip),
+            ("username", "OZonePerson"),
+            ("hostName", "home.ozoneperson.com"),
+            ("Command", "namecheap.domains.dns.setHosts"),
+            ("SLD", "omaralkersh"),
+            ("TLD", "com"),
+            ("HostName1", "@"),
+            ("RecordType1", "A"),
+            ("Address1", server_ip),
+            ("TTL1", "1800"),
+            ("HostName2", "www"),
+            ("RecordType2", "A"),
+            ("Address2", server_ip),
+            ("TTL2", "1800"),
+            ("HostName3", "vpn"),
+            ("RecordType3", "A"),
+            ("Address3", new_ip),
+            ("TTL3", "1800"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+
+        let actual = create_request(server_ip.into(), new_ip.into(), nc_api_key.into());
+
+        assert_eq!(expected, actual);
+    }
+}
