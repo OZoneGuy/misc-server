@@ -23,6 +23,12 @@ struct UpdateIpRequest {
     ip: String,
 }
 
+#[derive(serde::Serialize)]
+struct Version {
+    version: String,
+    commit: String,
+}
+
 fn record(number: usize, sub_domain: Cow<str>, ip: Cow<str>) -> Vec<(String, String)> {
     return vec![
         (format!("HostName{}", number), sub_domain.to_string()),
@@ -100,6 +106,17 @@ async fn health() -> impl Responder {
     HttpResponse::Ok().body("OK")
 }
 
+#[get("/version")]
+async fn version() -> impl Responder {
+    let version = Version {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        commit: option_env!("GH_SHA_REF")
+            .unwrap_or("not_commit")
+            .to_string(),
+    };
+    HttpResponse::Ok().json(version)
+}
+
 #[get("/")]
 async fn index() -> impl Responder {
     HttpResponse::Ok().body("This is an API server for personal use.")
@@ -124,8 +141,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(config.clone()))
             .service(index)
-            .service(update_ip)
+            .service(version)
             .service(health)
+            .service(update_ip)
     })
     .bind(("localhost", 8123))?
     .run()
