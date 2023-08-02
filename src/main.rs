@@ -1,4 +1,6 @@
 #![allow(clippy::needless_return)]
+use std::borrow::Cow;
+
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 const SECRETS_JSON: &str = include_str!("../secrets.json");
@@ -21,6 +23,44 @@ struct UpdateIpRequest {
     ip: String,
 }
 
+fn record(number: usize, sub_domain: Cow<str>, ip: Cow<str>) -> Vec<(String, String)> {
+    return vec![
+        (format!("HostName{}", number), sub_domain.to_string()),
+        (format!("RecordType{}", number), "A".to_string()),
+        (format!("Address{}", number), ip.to_string()),
+        (format!("TTL{}", number), "1800".to_string()),
+    ];
+}
+
+fn create_request(
+    server_ip: Cow<str>,
+    new_ip: Cow<str>,
+    nc_api_key: Cow<str>,
+) -> Vec<(String, String)> {
+    let mut params: Vec<(String, String)> = vec![
+        ("apiUser", "OZonePerson"),
+        ("apiKey", &nc_api_key),
+        ("ClientIp", &server_ip),
+        ("username", "OZonePerson"),
+        ("hostName", "home.ozoneperson.com"),
+        ("Command", "namecheap.domains.dns.setHosts"),
+        ("SLD", "omaralkersh"),
+        ("TLD", "com"),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+
+    vec![("@", &server_ip), ("www", &server_ip), ("vpn", &new_ip)]
+        .into_iter()
+        .enumerate()
+        .for_each(|(i, (sub_domain, ip))| {
+            params.append(&mut record(i + 1, sub_domain.into(), ip.clone()));
+        });
+
+    return params;
+}
+
 #[post("/update-ip")]
 async fn update_ip(req: web::Json<UpdateIpRequest>, config: web::Data<Config>) -> impl Responder {
     // Check if the IP has changed
@@ -30,31 +70,11 @@ async fn update_ip(req: web::Json<UpdateIpRequest>, config: web::Data<Config>) -
     }
 
     // load params to send to the request
-    let params = [
-        ("apiUser", "OZonePerson"),
-        ("apiKey", &config.nc_api_key),
-        ("ClientIp", &config.server_ip),
-        ("username", "OZonePerson"),
-        ("hostName", "home.ozoneperson.com"),
-        ("Command", "namecheap.domains.dns.setHosts"),
-        ("SLD", "omaralkersh"),
-        ("TLD", "com"),
-        // The base domain
-        ("HostName1", "@"),
-        ("RecordType1", "A"),
-        ("Address1", &config.server_ip),
-        ("TTL1", "1800"),
-        // The www subdomain
-        ("HostName1", "www"),
-        ("RecordType1", "A"),
-        ("Address1", &config.server_ip),
-        ("TTL1", "1800"),
-        // The VPN subdomain
-        ("HostName2", "vpn"),
-        ("RecordType2", "A"),
-        ("Address2", &req.ip),
-        ("TTL2", "1800"),
-    ];
+    let params = create_request(
+        Cow::from(&config.server_ip),
+        Cow::from(&req.ip),
+        Cow::from(&config.nc_api_key),
+    );
 
     // Create request to namecheap to update the IP
     let client = reqwest::Client::new();
