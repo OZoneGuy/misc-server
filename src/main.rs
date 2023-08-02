@@ -100,6 +100,11 @@ async fn health() -> impl Responder {
     HttpResponse::Ok().body("OK")
 }
 
+#[get("/")]
+async fn index() -> impl Responder {
+    HttpResponse::Ok().body("This is an API server for personal use.")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let secrets: Secrets = serde_json::from_str(SECRETS_JSON).unwrap();
@@ -118,6 +123,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(config.clone()))
+            .service(index)
             .service(update_ip)
             .service(health)
     })
