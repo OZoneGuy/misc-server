@@ -35,7 +35,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build Rust application
       env:
-        GH_SHA_REF: ${{ github.ref }}
+        GH_SHA_REF: ${{ github.sha }}
       run: cargo build --release
 
     - name: Copy binary to remote server
