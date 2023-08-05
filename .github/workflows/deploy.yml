@@ -45,8 +45,11 @@ jobs:
         mkdir -p ~/.ssh
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        echo "stopping server..."
+        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl stop api_server'
+        echo "stopped server"
+        echo "copying new binary..."
         scp -i ~/.ssh/id_rsa target/release/misc-server root@omaralkersh.com:/root/bin/api-server
-
-    - name: Restart server
-      run: |
-        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl restart api_server'
+        echo "starting server..."
+        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl start api_server'
+        echo "started server."
