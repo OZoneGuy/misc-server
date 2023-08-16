@@ -25,6 +25,8 @@ const SECRETS_JSON: &str = include_str!("../secrets.json");
 struct Secrets {
     #[serde(rename = "NAME_CHEAP_API_KEY")]
     nc_api_key: String,
+    #[serde(rename = "ENC_KEY")]
+    key: String,
 }
 
 #[derive(serde::Serialize)]
@@ -60,14 +62,14 @@ fn index_config(cfg: &mut ServiceConfig) {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let secrets: Secrets = serde_json::from_str(SECRETS_JSON).unwrap();
+    let secrets: Secrets =
+        serde_json::from_str(SECRETS_JSON).expect("Failed to parse the secrets json");
     let server_ip: String = reqwest::get("https://api.ipify.org")
         .await
-        .unwrap()
+        .expect("Failed to create request to get the server IP")
         .text()
         .await
-        .unwrap();
-
+        .expect("Failed to get the IP from request bodY");
     let config = Config {
         nc_api_key: secrets.nc_api_key,
         server_ip,
@@ -76,16 +78,20 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
     HttpServer::new(move || {
-        let key = Key::generate();
+        let key = Key::from(secrets.key.as_bytes());
         App::new()
+            .wrap(IdentityMiddleware::default())
+            .wrap(
+                SessionMiddleware::builder(CookieSessionStore::default(), key)
+                    .cookie_secure(true)
+                    .build(),
+            )
+            .wrap(Logger::default())
             .app_data(Data::new(config.clone()))
             .configure(s3_config)
             .service(update_ip)
             .configure(index_config)
             .configure(auth_config)
-            .wrap(IdentityMiddleware::default())
-            .wrap(SessionMiddleware::new(CookieSessionStore::default(), key))
-            .wrap(Logger::default())
     })
     .bind(("localhost", 8123))?
     .run()
