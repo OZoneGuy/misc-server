@@ -1,22 +1,18 @@
-use std::pin::Pin;
-
 use actix_identity::{Identity, IdentityExt};
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    body::MessageBody,
+    dev::{ServiceRequest, ServiceResponse},
     get, post,
     web::ServiceConfig,
     Error, HttpMessage, HttpRequest, HttpResponse, Responder,
 };
-use futures::{
-    future::{ok, Ready},
-    Future,
-};
+use actix_web_lab::middleware::Next;
 
 pub fn auth_config(cfg: &mut ServiceConfig) {
     cfg.service(login).service(logout).service(user);
 }
 
-#[post("/login")]
+#[get("/login")]
 pub async fn login(req: HttpRequest) -> impl Responder {
     Identity::login(&req.extensions(), "user_id".to_string()).unwrap();
 
@@ -39,50 +35,19 @@ pub async fn user(id: Option<Identity>) -> impl Responder {
     }
 }
 
-pub struct AuthMiddleware;
-impl<S, B> Transform<S, ServiceRequest> for AuthMiddleware
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = AuthMiddlewareService<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ok(AuthMiddlewareService { service })
+pub async fn auth_middleware(
+    req: ServiceRequest,
+    next: Next<impl MessageBody + 'static>,
+) -> Result<ServiceResponse<impl MessageBody>, Error> {
+    if req.get_identity().is_err() {
+        return Ok(req.into_response(
+            HttpResponse::Unauthorized()
+                .body("not logged in")
+                .map_into_right_body(),
+        ));
     }
-}
 
-pub struct AuthMiddlewareService<S> {
-    service: S,
-}
-
-impl<S, B> Service<ServiceRequest> for AuthMiddlewareService<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-
-    forward_ready!(service);
-
-    fn call(&self, req: ServiceRequest) -> Self::Future {
-        if req.get_identity().is_err() {
-            // req.into_response(res)
-            // let resp: ServiceResponse<B> = ServiceResponse::new(
-            return Box::pin(async move {
-                Ok(req.into_response(HttpResponse::Unauthorized().finish().into_body()))
-            });
-        };
-
-        return Box::pin(async move {
-            let res = self.service.call(req).await?;
-            Ok(res)
-        });
-    }
+    next.call(req)
+        .await
+        .map(ServiceResponse::map_into_left_body)
 }
