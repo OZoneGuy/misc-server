@@ -4,12 +4,14 @@ use actix_web::{
     HttpResponse,
 };
 
+use actix_web::web::Json;
 #[cfg(not(debug_assertions))]
 use actix_web::web::{get, post};
 use actix_web_lab::middleware::from_fn;
 use aws_sdk_s3::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
+use crate::errors::{Result, ServerError};
 use crate::{auth::auth_middleware, common::Config};
 
 #[allow(dead_code)]
@@ -40,13 +42,16 @@ pub fn s3_config(cfg: &mut ServiceConfig) {
     );
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+struct ObjectList(Vec<String>);
+
 #[cfg(debug_assertions)]
 #[get("/list_objects")]
 async fn list_objects(
     path: Option<Query<S3Query>>,
     s3: Data<Client>,
     config: Data<Config>,
-) -> HttpResponse {
+) -> Result<Json<ObjectList>> {
     let prefix = &path.map(|p| p.path.clone()).unwrap_or("".to_string());
 
     let objects = s3
@@ -55,8 +60,15 @@ async fn list_objects(
         .delimiter("/")
         .prefix(prefix)
         .send()
-        .await;
-    HttpResponse::Ok().body(format!("objects: {:?}", objects.unwrap().common_prefixes()))
+        .await?
+        .contents
+        .ok_or(ServerError::ListObjectsError {
+            message: "No contents".to_string(),
+        })?
+        .into_iter()
+        .map(|o| o.key.unwrap())
+        .collect();
+    Ok(Json(ObjectList(objects)))
 }
 
 #[cfg(debug_assertions)]
