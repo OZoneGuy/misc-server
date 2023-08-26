@@ -6,7 +6,7 @@ mod index;
 mod ip;
 mod s3;
 
-use std::time::Duration;
+// use std::time::Duration;
 
 use actix_identity::IdentityMiddleware;
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
@@ -47,13 +47,13 @@ impl Secrets {
 
 async fn create_s3_client(provider: &Secrets) -> aws_sdk_s3::Client {
     let config = aws_config::from_env()
-        .region(Region::new("us-east-2"))
+        .region(Region::new("us-east-1"))
         .credentials_provider(provider.aws_creds())
         .load()
         .await;
 
     let timeout_config = TimeoutConfig::builder()
-        .connect_timeout(Duration::from_secs(7))
+        // .connect_timeout(Duration::from_secs(7))
         .build();
 
     let s3_config = S3Builder::from(&config)
@@ -67,7 +67,7 @@ async fn create_s3_client(provider: &Secrets) -> aws_sdk_s3::Client {
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(Env::default().default_filter_or("debug"));
 
-    info!("Entering main()");
+    info!("Entering main");
 
     let secrets: Secrets =
         serde_json::from_str(SECRETS_JSON).expect("Failed to parse the secrets json");
@@ -85,7 +85,7 @@ async fn main() -> std::io::Result<()> {
     let config = Config {
         nc_api_key: secrets.nc_api_key.clone(),
         server_ip,
-        bucket_name: "remote-data-sync".into(),
+        bucket_name: "unraid-remote-sync".into(),
     };
 
     let s3_client = create_s3_client(&secrets).await;
