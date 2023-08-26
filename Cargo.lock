@@ -1628,6 +1628,7 @@ dependencies = [
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
+ "base64 0.21.2",
  "env_logger",
  "futures",
  "log",

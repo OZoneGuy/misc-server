@@ -1,7 +1,6 @@
 use actix_web::{
     get,
     web::{scope, Data, Query, ServiceConfig},
-    HttpResponse,
 };
 
 use actix_web::web::Json;
@@ -9,6 +8,7 @@ use actix_web::web::Json;
 use actix_web::web::{get, post};
 use actix_web_lab::middleware::from_fn;
 use aws_sdk_s3::Client;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{Result, ServerError};
@@ -45,6 +45,13 @@ pub fn s3_config(cfg: &mut ServiceConfig) {
 #[derive(Deserialize, Serialize, Debug)]
 struct ObjectList(Vec<String>);
 
+#[derive(Deserialize, Serialize, Debug)]
+struct S3Object {
+    blob: String,
+    name: String,
+    mime_type: String,
+}
+
 #[cfg(debug_assertions)]
 #[get("/list_objects")]
 async fn list_objects(
@@ -73,6 +80,45 @@ async fn list_objects(
 
 #[cfg(debug_assertions)]
 #[get("/get_object")]
-async fn get_object(file_path: Option<Query<S3Query>>) -> HttpResponse {
-    HttpResponse::Ok().body(format!("get_object: {:?}", file_path))
+async fn get_object(
+    file_path: Option<Query<S3Query>>,
+    s3: Data<Client>,
+    config: Data<Config>,
+) -> Result<Json<S3Object>> {
+    if let None = file_path {
+        return Err(ServerError::GetObjectError {
+            message: "No file path".to_string(),
+        });
+    }
+
+    let key = &file_path.unwrap().path;
+
+    let obj = s3
+        .get_object()
+        .bucket(&config.bucket_name)
+        .key(key)
+        .send()
+        .await?;
+
+    let bytes = obj
+        .body
+        .collect()
+        .await
+        .map_err(|e| ServerError::GetObjectError {
+            message: e.to_string(),
+        })?;
+
+    let blob = STANDARD_NO_PAD.encode(&bytes.to_vec());
+
+    let mime_type = obj.content_type.ok_or(ServerError::GetObjectError {
+        message: "No content type".to_string(),
+    })?;
+
+    let name = key.split("/").last().unwrap().to_string();
+
+    Ok(Json(S3Object {
+        blob,
+        name,
+        mime_type,
+    }))
 }
