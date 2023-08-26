@@ -28,7 +28,7 @@ async fn health(s3_client: Option<Data<S3Client>>) -> Result<HttpResponse> {
     if issues.is_empty() {
         Ok(HttpResponse::Ok().body("OK"))
     } else {
-        Err(ServerError::HealthCheckError(issues))
+        Err(ServerError::HealthCheckError { errors: issues })
     }
 }
 
