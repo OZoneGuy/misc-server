@@ -12,7 +12,7 @@ pub fn auth_config(cfg: &mut ServiceConfig) {
     cfg.service(login).service(logout).service(user);
 }
 
-#[get("/login")]
+#[post("/login")]
 pub async fn login(req: HttpRequest) -> impl Responder {
     Identity::login(&req.extensions(), "user_id".to_string()).unwrap();
 
