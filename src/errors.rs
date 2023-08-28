@@ -1,3 +1,4 @@
+use actix_web::http::StatusCode;
 use serde::Serialize;
 use thiserror::Error;
 
@@ -14,6 +15,12 @@ pub enum ServerError {
     ListObjectsError { message: String },
     #[error("Failed to get object: {message}")]
     GetObjectError { message: String },
+    #[error("Login failed: {message}")]
+    LoginError {
+        #[serde(skip_serializing)]
+        code: StatusCode,
+        message: String,
+    },
 }
 
 impl From<SdkError<ListObjectsV2Error>> for ServerError {
@@ -45,6 +52,9 @@ impl actix_web::error::ResponseError for ServerError {
             }
             ServerError::GetObjectError { .. } => {
                 actix_web::HttpResponse::InternalServerError().json(self)
+            }
+            ServerError::LoginError { code, .. } => {
+                actix_web::HttpResponse::build(*code).json(self)
             }
         }
     }
