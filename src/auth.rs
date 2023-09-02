@@ -9,7 +9,7 @@ use actix_web::{
     Error, HttpMessage, HttpRequest, HttpResponse, HttpResponseBuilder, Responder,
 };
 use actix_web_lab::middleware::Next;
-use ldap3::LdapConn;
+use ldap3::{Ldap, LdapConnAsync};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{Result, ServerError};
@@ -27,23 +27,51 @@ pub struct LoginRequest {
 #[derive(Serialize, Debug)]
 pub struct User(String);
 
+pub async fn create_ldap_conn(url: &str) -> Result<(LdapConnAsync, Ldap)> {
+    let (con, ldap) = LdapConnAsync::new(url)
+        .await
+        .map_err(|e| ServerError::LoginError {
+            code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Failed to connect to LDAP server: {}", e.to_string()),
+        })?;
+
+    Ok((con, ldap))
+}
+
 #[post("/login")]
 pub async fn login(req: HttpRequest, login_details: Json<LoginRequest>) -> Result<HttpResponse> {
     // login to ldap server and get user_id
-    let mut ldap = LdapConn::new("ldap://localhost:389").map_err(|e| ServerError::LoginError {
-        code: StatusCode::INTERNAL_SERVER_ERROR,
-        message: format!("Failed to connect to ldap server: {}", e.to_string()),
-    })?;
+    let (con, mut ldap) = create_ldap_conn("ldap://localhost:3890").await?;
+
+    ldap3::drive!(con);
+
     let bound = ldap
-        .simple_bind(&login_details.username, &login_details.password)
+        .simple_bind(
+            &format!(
+                "uid={},ou=people,dc=omaralkersh,dc=com",
+                login_details.username
+            ),
+            &login_details.password,
+        )
+        .await
         .map_err(|e| ServerError::LoginError {
             code: StatusCode::UNAUTHORIZED,
             message: e.to_string(),
         })?;
 
-    Identity::login(&req.extensions(), bound.matched).map_err(|e| ServerError::LoginError {
-        code: StatusCode::INTERNAL_SERVER_ERROR,
-        message: format!("Failed to login: {}", e.to_string()),
+    if bound.rc != 0 {
+        return Err(ServerError::LoginError {
+            // TODO: get better status codes
+            code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Failed to login. Bind returned non-zero: {}", bound.rc),
+        });
+    };
+
+    Identity::login(&req.extensions(), login_details.username.clone()).map_err(|e| {
+        ServerError::LoginError {
+            code: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("Failed to save session: {}", e.to_string()),
+        }
     })?;
 
     Ok(HttpResponse::Ok().body("Logged in"))
