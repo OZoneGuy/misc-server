@@ -1,4 +1,7 @@
-use crate::errors::{Result, ServerError};
+use crate::{
+    auth::create_ldap_conn,
+    errors::{Result, ServerError},
+};
 
 use actix_web::{
     get,
@@ -18,12 +21,19 @@ async fn health(s3_client: Option<Data<S3Client>>) -> Result<HttpResponse> {
     let mut issues = vec![];
 
     if let Some(s3) = s3_client {
-        if let Err(_) = s3.list_buckets().send().await {
-            issues.push("S3 client is not healthy".to_string());
+        if let Err(e) = s3.list_buckets().send().await {
+            issues.push(format!("Failed to connect to S3 bucket: {}", e.to_string()));
         }
     } else {
         issues.push("S3 client not initialized".to_string());
     };
+
+    if let Err(e) = create_ldap_conn("ldap://localhost:3890").await {
+        issues.push(format!(
+            "Failed to connect to LDAP server: {}",
+            e.to_string()
+        ));
+    }
 
     if issues.is_empty() {
         Ok(HttpResponse::Ok().body("OK"))
