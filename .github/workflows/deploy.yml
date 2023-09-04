@@ -59,6 +59,7 @@ jobs:
 
   run_ldap_docker:
     runs-on: ['self-hosted']
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.modified, './ldap.yml') }}
     environment: api-server
     steps:
     - name: Checkout code
@@ -79,6 +80,9 @@ jobs:
     needs: [run_ldap_docker, build_and_deploy]
     runs-on: ['self-hosted']
     environment: api-server
+    if: ${{ needs.buid_and_deploy.result == 'success'
+            && (needs.run_ldap_docker.result == 'success'
+                || needs.run_ldap_docker.ruselt == 'skipped') }}
     steps:
     - name: Setup SSH
       env:
