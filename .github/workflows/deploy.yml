@@ -8,6 +8,9 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ['self-hosted']
+    if: |
+      contains(github.event.head_commit.modified, 'Cargo.*')
+      && contains(github.event.head_commit.modified, 'src/**')
     environment: api-server
     steps:
     - name: Checkout code
