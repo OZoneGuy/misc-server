@@ -60,3 +60,48 @@ jobs:
     - name: Check server
       run: |
         ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl status api_server'
+
+  run_ldap_docker:
+    runs-on: ['self-hosted']
+    environment: api-server
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Setup SSH
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+    - name: Copy docker-compose file
+      run: scp -i ~/.ssh/id_rsa ldap.yml root@omaralkersh.com:~/docker-compose/ldap.yml
+    - name: Start docker-compose
+      run: ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'cd docker-compose && docker-compose -f ldap.yml up -d'
+
+  check:
+    needs: [run_ldap_docker, build_and_deploy]
+    runs-on: ['self-hosted']
+    environment: api-server
+    steps:
+    - name: Setup SSH
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+    - name: Check the service status
+      run: ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl status api_server.service'
+    - name: Check the server health
+      run: curl https://omaralkersh.com/api/health
+    - name: Check the version
+      run: |
+        version=`curl https://omaralkersh.com/api/version`
+        deployed_commit=$(echo $version | jq -r '.commit')
+        current_commit=${{ github.sha }}
+        if [ "$deployed_commit" != "$current_commit" ]; then
+          echo "Deployed commit: $deployed_commit"
+          echo "Current commit: $current_commit"
+          exit 1
+        fi
