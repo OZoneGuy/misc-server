@@ -94,10 +94,10 @@ jobs:
     - name: Check the service status
       run: ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl status api_server.service'
     - name: Check the server health
-      run: curl https://omaralkersh.com/api/health
+      run: curl --insecure https://omaralkersh.com/api/health
     - name: Check the version
       run: |
-        version=`curl https://omaralkersh.com/api/version`
+        version=$(curl --insecure https://omaralkersh.com/api/version)
         deployed_commit=$(echo $version | jq -r '.commit')
         current_commit=${{ github.sha }}
         if [ "$deployed_commit" != "$current_commit" ]; then
