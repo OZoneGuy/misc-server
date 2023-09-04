@@ -80,7 +80,7 @@ jobs:
     needs: [run_ldap_docker, build_and_deploy]
     runs-on: ['self-hosted']
     environment: api-server
-    if: ${{ needs.buid_and_deploy.result == 'success'
+    if: ${{ needs.build_and_deploy.result == 'success'
             && (needs.run_ldap_docker.result == 'success'
                 || needs.run_ldap_docker.ruselt == 'skipped') }}
     steps:
