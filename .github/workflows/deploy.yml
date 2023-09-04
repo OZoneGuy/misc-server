@@ -22,8 +22,6 @@ jobs:
       env:
         SECRETS_JSON: ${{ secrets.SERVER_SECRETS }}
       run: echo "$SECRETS_JSON" > secrets.json
-
-    # Step to restore the cached dependencies
     - uses: actions/cache@v3
       with:
         path: |
@@ -37,7 +35,6 @@ jobs:
       env:
         GH_SHA_REF: ${{ github.sha }}
       run: cargo build --release
-
     - name: Setup SSH
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH }}
@@ -45,18 +42,17 @@ jobs:
         mkdir -p ~/.ssh
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-
+    - name: Stop the server
+      run: ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl stop api_server.service'
     - name: Copy binary to remote server
       run: |
         echo "copying new binary..."
         scp -i ~/.ssh/id_rsa target/release/misc-server root@omaralkersh.com:/root/bin/api-server
-
     - name: Start server
       run: |
         echo "starting server..."
-        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl restart api_server'
+        ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl start api_server'
         echo "started server."
-
     - name: Check server
       run: |
         ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl status api_server'
