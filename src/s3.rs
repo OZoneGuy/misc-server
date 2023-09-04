@@ -4,8 +4,6 @@ use actix_web::{
 };
 
 use actix_web::web::Json;
-#[cfg(not(debug_assertions))]
-use actix_web::web::{get, post};
 use actix_web_lab::middleware::from_fn;
 use aws_sdk_s3::Client;
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
@@ -20,25 +18,12 @@ struct S3Query {
     path: String,
 }
 
-#[cfg(not(debug_assertions))]
-async fn not_ready_handler() -> HttpResponse {
-    HttpResponse::Ok().body("Not released yet")
-}
-
 pub fn s3_config(cfg: &mut ServiceConfig) {
-    #[cfg(debug_assertions)]
     cfg.service(
         scope("/s3")
             .wrap(from_fn(auth_middleware))
             .service(list_objects)
             .service(get_object),
-    );
-
-    #[cfg(not(debug_assertions))]
-    cfg.service(
-        scope("/s3")
-            .route("/", get().to(not_ready_handler))
-            .route("/", post().to(not_ready_handler)),
     );
 }
 
@@ -52,7 +37,6 @@ struct S3Object {
     mime_type: String,
 }
 
-#[cfg(debug_assertions)]
 #[get("/list_objects")]
 async fn list_objects(
     path: Option<Query<S3Query>>,
@@ -69,7 +53,7 @@ async fn list_objects(
         .send()
         .await?
         .contents
-        .ok_or(ServerError::ListObjectsError {
+        .ok_or(ServerError::ListObjects {
             message: "No contents".to_string(),
         })?
         .into_iter()
@@ -78,15 +62,14 @@ async fn list_objects(
     Ok(Json(ObjectList(objects)))
 }
 
-#[cfg(debug_assertions)]
 #[get("/get_object")]
 async fn get_object(
     file_path: Option<Query<S3Query>>,
     s3: Data<Client>,
     config: Data<Config>,
 ) -> Result<Json<S3Object>> {
-    if let None = file_path {
-        return Err(ServerError::GetObjectError {
+    if file_path.is_none() {
+        return Err(ServerError::GetObject {
             message: "No file path".to_string(),
         });
     }
@@ -104,17 +87,17 @@ async fn get_object(
         .body
         .collect()
         .await
-        .map_err(|e| ServerError::GetObjectError {
+        .map_err(|e| ServerError::GetObject {
             message: e.to_string(),
         })?;
 
-    let blob = STANDARD_NO_PAD.encode(&bytes.to_vec());
+    let blob = STANDARD_NO_PAD.encode(bytes.to_vec());
 
-    let mime_type = obj.content_type.ok_or(ServerError::GetObjectError {
+    let mime_type = obj.content_type.ok_or(ServerError::GetObject {
         message: "No content type".to_string(),
     })?;
 
-    let name = key.split("/").last().unwrap().to_string();
+    let name = key.split('/').last().unwrap().to_string();
 
     Ok(Json(S3Object {
         blob,

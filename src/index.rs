@@ -22,23 +22,20 @@ async fn health(s3_client: Option<Data<S3Client>>) -> Result<HttpResponse> {
 
     if let Some(s3) = s3_client {
         if let Err(e) = s3.list_buckets().send().await {
-            issues.push(format!("Failed to connect to S3 bucket: {}", e.to_string()));
+            issues.push(format!("Failed to connect to S3 bucket: {}", e));
         }
     } else {
         issues.push("S3 client not initialized".to_string());
     };
 
     if let Err(e) = create_ldap_conn("ldap://localhost:3890").await {
-        issues.push(format!(
-            "Failed to connect to LDAP server: {}",
-            e.to_string()
-        ));
+        issues.push(format!("Failed to connect to LDAP server: {}", e));
     }
 
     if issues.is_empty() {
         Ok(HttpResponse::Ok().body("OK"))
     } else {
-        Err(ServerError::HealthCheckError { errors: issues })
+        Err(ServerError::HealthCheck { errors: issues })
     }
 }
 

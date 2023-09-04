@@ -10,13 +10,13 @@ use aws_sdk_s3::{
 #[derive(Serialize, Debug, Error)]
 pub enum ServerError {
     #[error("Failed the health check with the following errors: {errors:?}")]
-    HealthCheckError { errors: Vec<String> },
+    HealthCheck { errors: Vec<String> },
     #[error("Failed to retrieve objects list: {message}")]
-    ListObjectsError { message: String },
+    ListObjects { message: String },
     #[error("Failed to get object: {message}")]
-    GetObjectError { message: String },
+    GetObject { message: String },
     #[error("Login failed: {message}")]
-    LoginError {
+    Login {
         #[serde(skip_serializing)]
         code: StatusCode,
         message: String,
@@ -25,7 +25,7 @@ pub enum ServerError {
 
 impl From<SdkError<ListObjectsV2Error>> for ServerError {
     fn from(e: SdkError<ListObjectsV2Error>) -> Self {
-        ServerError::ListObjectsError {
+        ServerError::ListObjects {
             message: e.to_string(),
         }
     }
@@ -33,7 +33,7 @@ impl From<SdkError<ListObjectsV2Error>> for ServerError {
 
 impl From<SdkError<GetObjectError>> for ServerError {
     fn from(e: SdkError<GetObjectError>) -> Self {
-        ServerError::GetObjectError {
+        ServerError::GetObject {
             message: e.to_string(),
         }
     }
@@ -44,18 +44,16 @@ pub type Result<T> = std::result::Result<T, ServerError>;
 impl actix_web::error::ResponseError for ServerError {
     fn error_response(&self) -> actix_web::HttpResponse {
         match self {
-            ServerError::HealthCheckError { .. } => {
+            ServerError::HealthCheck { .. } => {
                 actix_web::HttpResponse::InternalServerError().json(self)
             }
-            ServerError::ListObjectsError { .. } => {
+            ServerError::ListObjects { .. } => {
                 actix_web::HttpResponse::InternalServerError().json(self)
             }
-            ServerError::GetObjectError { .. } => {
+            ServerError::GetObject { .. } => {
                 actix_web::HttpResponse::InternalServerError().json(self)
             }
-            ServerError::LoginError { code, .. } => {
-                actix_web::HttpResponse::build(*code).json(self)
-            }
+            ServerError::Login { code, .. } => actix_web::HttpResponse::build(*code).json(self),
         }
     }
 }

@@ -30,9 +30,9 @@ pub struct User(String);
 pub async fn create_ldap_conn(url: &str) -> Result<(LdapConnAsync, Ldap)> {
     let (con, ldap) = LdapConnAsync::new(url)
         .await
-        .map_err(|e| ServerError::LoginError {
+        .map_err(|e| ServerError::Login {
             code: StatusCode::INTERNAL_SERVER_ERROR,
-            message: format!("Failed to connect to LDAP server: {}", e.to_string()),
+            message: format!("Failed to connect to LDAP server: {}", e),
         })?;
 
     Ok((con, ldap))
@@ -54,13 +54,13 @@ pub async fn login(req: HttpRequest, login_details: Json<LoginRequest>) -> Resul
             &login_details.password,
         )
         .await
-        .map_err(|e| ServerError::LoginError {
+        .map_err(|e| ServerError::Login {
             code: StatusCode::UNAUTHORIZED,
             message: e.to_string(),
         })?;
 
     if bound.rc != 0 {
-        return Err(ServerError::LoginError {
+        return Err(ServerError::Login {
             // TODO: get better status codes
             code: StatusCode::INTERNAL_SERVER_ERROR,
             message: format!("Failed to login. Bind returned non-zero: {}", bound.rc),
@@ -68,9 +68,9 @@ pub async fn login(req: HttpRequest, login_details: Json<LoginRequest>) -> Resul
     };
 
     Identity::login(&req.extensions(), login_details.username.clone()).map_err(|e| {
-        ServerError::LoginError {
+        ServerError::Login {
             code: StatusCode::INTERNAL_SERVER_ERROR,
-            message: format!("Failed to save session: {}", e.to_string()),
+            message: format!("Failed to save session: {}", e),
         }
     })?;
 
@@ -86,8 +86,8 @@ pub async fn logout(id: Identity) -> impl Responder {
 
 #[get("/user")]
 pub async fn user(id: Option<Identity>) -> Result<HttpResponse> {
-    id.and_then(|u| Some(HttpResponseBuilder::new(StatusCode::OK).json(User(u.id().unwrap()))))
-        .ok_or(ServerError::LoginError {
+    id.map(|u| HttpResponseBuilder::new(StatusCode::OK).json(User(u.id().unwrap())))
+        .ok_or(ServerError::Login {
             code: StatusCode::UNAUTHORIZED,
             message: "Not logged in".to_string(),
         })
