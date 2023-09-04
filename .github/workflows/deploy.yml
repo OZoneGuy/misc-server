@@ -49,6 +49,7 @@ jobs:
         echo "copying new binary..."
         scp -i ~/.ssh/id_rsa target/release/misc-server root@omaralkersh.com:/root/bin/api-server
     - name: Start server
+      if: ${{ always() }}
       run: |
         echo "starting server..."
         ssh -i ~/.ssh/id_rsa root@omaralkersh.com 'systemctl start api_server'
