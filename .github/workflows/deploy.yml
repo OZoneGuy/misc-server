@@ -9,9 +9,9 @@ jobs:
   build_and_deploy:
     runs-on: ['self-hosted']
     if: |
-      ( contains(github.event.head_commit.modified, 'Cargo.*')
-      && contains(github.event.head_commit.modified, 'src/**') )
-      || contains(github.event.head_commit.modified, '.github/workflows/deploy.yml')
+      ${{ (contains(github.event.head_commit.modified, 'Cargo.*')
+      && contains(github.event.head_commit.modified, 'src/**'))
+      || contains(github.event.head_commit.modified, '.github/workflows/deploy.yml') }}
     environment: api-server
     steps:
     - name: Checkout code
@@ -65,12 +65,12 @@ jobs:
   run_ldap_docker:
     runs-on: ['self-hosted']
     if: |
-      contains(github.event.head_commit.modified, './ldap.yml')
-      || contains(github.event.head_commit.modified, '.github/workflows/deploy.yml')
+      ${{ contains(github.event.head_commit.modified, './ldap.yml')
+      || contains(github.event.head_commit.modified, '.github/workflows/deploy.yml') }}
     environment: api-server
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Setup SSH
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH }}
