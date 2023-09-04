@@ -81,9 +81,11 @@ jobs:
     needs: [run_ldap_docker, build_and_deploy]
     runs-on: ['self-hosted']
     environment: api-server
-    if: ${{ needs.build_and_deploy.result == 'success'
-            && (needs.run_ldap_docker.result == 'success'
-                || needs.run_ldap_docker.result == 'skipped') }}
+    if: |
+      always()
+      && needs.build_and_deploy.result == 'success'
+      && (needs.run_ldap_docker.result == 'success'
+          || needs.run_ldap_docker.result == 'skipped')
     steps:
     - name: Setup SSH
       env:
