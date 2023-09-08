@@ -28,7 +28,17 @@ pub fn s3_config(cfg: &mut ServiceConfig) {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct ObjectList(Vec<String>);
+enum ObjectType {
+    File,
+    Dir,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct ObjectEntry {
+    name: String,
+    kind: ObjectType,
+}
+// struct ObjectList(Vec<String>);
 
 #[derive(Deserialize, Serialize, Debug)]
 struct S3Object {
@@ -42,7 +52,7 @@ async fn list_objects(
     path: Option<Query<S3Query>>,
     s3: Data<Client>,
     config: Data<Config>,
-) -> Result<Json<ObjectList>> {
+) -> Result<Json<Vec<ObjectEntry>>> {
     let prefix = &path.map(|p| p.path.clone()).unwrap_or("".to_string());
 
     let objects = s3
@@ -57,9 +67,16 @@ async fn list_objects(
             message: "No contents".to_string(),
         })?
         .into_iter()
-        .map(|o| o.key.unwrap())
+        .map(|o| ObjectEntry {
+            name: o.key.clone().unwrap(),
+            kind: if o.key.unwrap().chars().last().unwrap() == '/' {
+                ObjectType::Dir
+            } else {
+                ObjectType::File
+            },
+        })
         .collect();
-    Ok(Json(ObjectList(objects)))
+    Ok(Json(objects))
 }
 
 #[get("/get_object")]
