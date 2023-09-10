@@ -7,6 +7,7 @@ use actix_web::web::Json;
 use actix_web_lab::middleware::from_fn;
 use aws_sdk_s3::Client;
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{Result, ServerError};
@@ -55,28 +56,33 @@ async fn list_objects(
 ) -> Result<Json<Vec<ObjectEntry>>> {
     let prefix = &path.map(|p| p.path.clone()).unwrap_or("".to_string());
 
-    let objects = s3
+    debug!("Getting objects with prefix: {}", &prefix);
+    let res = s3
         .list_objects_v2()
         .bucket(&config.bucket_name)
         .delimiter("/")
         .prefix(prefix)
         .send()
-        .await?
-        .contents
-        .ok_or(ServerError::ListObjects {
-            message: "No contents".to_string(),
-        })?
-        .into_iter()
-        .map(|o| ObjectEntry {
-            name: o.key.clone().unwrap(),
-            kind: if o.key.unwrap().chars().last().unwrap() == '/' {
-                ObjectType::Dir
-            } else {
-                ObjectType::File
-            },
-        })
-        .collect();
-    Ok(Json(objects))
+        .await?;
+    let objects: Vec<ObjectEntry> = res.contents.map_or(vec![], |c| {
+        c.into_iter()
+            .map(|o| ObjectEntry {
+                name: o.key.unwrap(),
+                kind: ObjectType::File,
+            })
+            .collect()
+    });
+    let mut dirs: Vec<ObjectEntry> = res.common_prefixes.map_or(vec![], |c| {
+        c.into_iter()
+            .map(|o| ObjectEntry {
+                name: o.prefix.unwrap(),
+                kind: ObjectType::Dir,
+            })
+            .collect()
+    });
+
+    dirs.extend(objects);
+    Ok(Json(dirs))
 }
 
 #[get("/get_object")]
