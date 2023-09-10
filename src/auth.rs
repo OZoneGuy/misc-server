@@ -55,14 +55,14 @@ pub async fn login(req: HttpRequest, login_details: Json<LoginRequest>) -> Resul
         )
         .await
         .map_err(|e| ServerError::Login {
-            code: StatusCode::UNAUTHORIZED,
+            code: StatusCode::INTERNAL_SERVER_ERROR,
             message: e.to_string(),
         })?;
 
     if bound.rc != 0 {
         return Err(ServerError::Login {
             // TODO: get better status codes
-            code: StatusCode::INTERNAL_SERVER_ERROR,
+            code: StatusCode::UNAUTHORIZED,
             message: format!("Failed to login. Bind returned non-zero: {}", bound.rc),
         });
     };
