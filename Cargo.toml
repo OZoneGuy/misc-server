@@ -22,4 +22,5 @@ log = "0.4.20"
 thiserror = "1.0.47"
 base64 = "0.21.2"
 ldap3 = "0.11.3"
+actix-cors = "0.6.4"
 

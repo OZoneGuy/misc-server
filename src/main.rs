@@ -6,7 +6,7 @@ mod index;
 mod ip;
 mod s3;
 
-// use std::time::Duration;
+use actix_cors::Cors;
 
 use actix_identity::IdentityMiddleware;
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
@@ -94,7 +94,19 @@ async fn main() -> std::io::Result<()> {
     info!("Starting server");
     HttpServer::new(move || {
         let key = Key::from(secrets.key.as_bytes());
+
+        let cors = if cfg!(debug_assertions) {
+            Cors::default()
+                .allow_any_origin()
+                .allow_any_method()
+                .allow_any_header()
+                .supports_credentials()
+        } else {
+            Cors::default()
+        };
+
         App::new()
+            .wrap(cors)
             .wrap(IdentityMiddleware::default())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), key)
