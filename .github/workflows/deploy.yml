@@ -65,7 +65,7 @@ jobs:
   run_ldap_docker:
     runs-on: ['self-hosted']
     if: |
-      ${{ contains(github.event.head_commit.modified, './ldap.yml')
+      ${{ contains(github.event.head_commit.modified, 'ldap.yml')
       || contains(github.event.head_commit.modified, '.github/workflows/deploy.yml') }}
     environment: api-server
     steps:
