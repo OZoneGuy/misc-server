@@ -90,9 +90,8 @@ jobs:
     environment: api-server
     if: |
       always()
-      && needs.build_and_deploy.result == 'success'
-      && (needs.run_ldap_docker.result == 'success'
-          || needs.run_ldap_docker.result == 'skipped')
+      && needs.build_and_deploy.result != 'failure'
+      && needs.run_ldap_docker.result != 'failure'
     steps:
     - name: Setup SSH
       env:
