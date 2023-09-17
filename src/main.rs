@@ -10,7 +10,7 @@ use actix_cors::Cors;
 
 use actix_identity::IdentityMiddleware;
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use actix_web::{cookie::Key, middleware::Logger, web::Data, App, HttpServer};
+use actix_web::{cookie::Key, http, middleware::Logger, web::Data, App, HttpServer};
 use auth::auth_config;
 use aws_credential_types::Credentials;
 use aws_sdk_s3::config::{timeout::TimeoutConfig, Builder as S3Builder, Region};
@@ -96,13 +96,19 @@ async fn main() -> std::io::Result<()> {
         let key = Key::from(secrets.key.as_bytes());
 
         let cors = if cfg!(debug_assertions) {
-            Cors::default()
-                .allow_any_origin()
-                .allow_any_method()
-                .allow_any_header()
-                .supports_credentials()
+            Cors::permissive()
         } else {
             Cors::default()
+                .allowed_origin_fn(|origin, _req_head| {
+                    origin.as_bytes().ends_with(b"omaralkersh.com")
+                })
+                .allowed_methods(vec!["GET", "POST"])
+                .allowed_headers(vec![
+                    http::header::AUTHORIZATION,
+                    http::header::ACCEPT,
+                    http::header::CONTENT_TYPE,
+                ])
+                .supports_credentials()
         };
 
         App::new()
