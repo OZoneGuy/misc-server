@@ -1,5 +1,6 @@
 #![allow(private_in_public)]
 use actix_web::{post, web, HttpResponse, Responder};
+use log::{debug, info};
 use std::borrow::Cow;
 
 use crate::common::Config;
@@ -54,11 +55,14 @@ pub async fn update_ip(
     req: web::Json<UpdateIpRequest>,
     config: web::Data<Config>,
 ) -> impl Responder {
+    info!("Requsting to update the IP to: {}", &req.ip);
     // Check if the IP has changed
     let old_ip = std::fs::read_to_string(OLD_IP_PATH).unwrap_or("".to_string());
     if old_ip == req.ip {
+        info!("IP has not changed");
         return HttpResponse::Ok().body("IP has not changed");
     }
+    info!("IP has changed, updating...");
 
     // load params to send to the request
     let params = create_request(
@@ -67,6 +71,7 @@ pub async fn update_ip(
         Cow::from(&config.nc_api_key),
     );
 
+    debug!("Params: {:?}", &params);
     // Create request to namecheap to update the IP
     let client = reqwest::Client::new();
     let res = client
@@ -74,6 +79,7 @@ pub async fn update_ip(
         .form(&params)
         .send()
         .await;
+    info!("Sent the request to namecheap");
 
     return match res {
         Ok(_) => {

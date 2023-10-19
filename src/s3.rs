@@ -91,6 +91,7 @@ async fn get_object(
     s3: Data<Client>,
     config: Data<Config>,
 ) -> Result<Json<S3Object>> {
+    debug!("Getting object: {:?}", &file_path);
     if file_path.is_none() {
         return Err(ServerError::GetObject {
             message: "No file path".to_string(),

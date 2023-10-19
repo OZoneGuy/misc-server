@@ -18,7 +18,7 @@ use common::Config;
 use env_logger::Env;
 use index::index_config;
 use ip::update_ip;
-use log::info;
+use log::{debug, info};
 use s3::s3_config;
 
 const SECRETS_JSON: &str = include_str!("../secrets.json");
@@ -73,20 +73,24 @@ async fn main() -> std::io::Result<()> {
         serde_json::from_str(SECRETS_JSON).expect("Failed to parse the secrets json");
     info!("Got secrets");
 
+    let mut server_ip = std::fs::read_to_string("/tmp/current_ip.txt").unwrap_or("".to_string());
     // TODO: cache the results. This causes the largest delay in the startup
-    let server_ip: String = reqwest::get("https://api.ipify.org")
-        .await
-        .expect("Failed to create request to get the server IP")
-        .text()
-        .await
-        .expect("Failed to get the IP from request bodY");
-    info!("Got server IP");
+    if server_ip == "" {
+        server_ip = reqwest::get("https://api.ipify.org")
+            .await
+            .expect("Failed to create request to get the server IP")
+            .text()
+            .await
+            .expect("Failed to get the IP from request bodY");
+    };
+    info!("Got server IP: {}", &server_ip);
 
     let config = Config {
         nc_api_key: secrets.nc_api_key.clone(),
         server_ip,
         bucket_name: "unraid-remote-sync".into(),
     };
+    debug!("Config: {}, {}", &config.server_ip, &config.bucket_name);
 
     let s3_client = create_s3_client(&secrets).await;
     info!("Created S3 client");
@@ -96,8 +100,10 @@ async fn main() -> std::io::Result<()> {
         let key = Key::from(secrets.key.as_bytes());
 
         let cors = if cfg!(debug_assertions) {
+            debug!("Permissive CORS");
             Cors::permissive()
         } else {
+            debug!("Strict CORS");
             Cors::default()
                 .allowed_origin_fn(|origin, _req_head| {
                     origin.as_bytes().ends_with(b"omaralkersh.com")
